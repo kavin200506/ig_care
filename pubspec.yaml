@@ -1,0 +1,43 @@
+name: asha_ehr_app
+description: Mobile EHR companion app for ASHA workers and PHC staff.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI and Styling
+  google_fonts: ^6.1.0
+  flutter_staggered_animations: ^1.1.1
+
+  # Firebase Core (Required)
+  firebase_core: ^3.6.0
+  
+  # Optional but useful
+  firebase_analytics: ^11.3.3
+  firebase_auth: ^5.3.1      # Authentication
+  cloud_firestore: ^5.4.4
+  shared_preferences: ^2.3.2
+  # Charts
+  fl_chart: ^0.68.0
+  
+  # State Management
+  provider: ^6.1.2
+  
+  # Utilities
+  intl: ^0.19.0
+  
+  # Icons
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

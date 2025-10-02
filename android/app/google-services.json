@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "892525529",
+    "project_id": "igcare",
+    "storage_bucket": "igcare.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892525529:android:dfff602f6d400d446717c8",
+        "android_client_info": {
+          "package_name": "com.example.ig_care"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOxNSHVRVOU1NN-QlSbkqjAwTcf7RVMhk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
