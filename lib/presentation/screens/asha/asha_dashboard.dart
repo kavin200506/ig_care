@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/colors.dart';
-import '../../../data/models/patient.dart';
-import '../../widgets/patient_card.dart';
+import '../../../services/profile_service.dart';
+import '../../../services/auth_service.dart';
+import '../../widgets/profile_edit_screen.dart';
+import '../onboarding/role_selection_screen.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -13,6 +15,11 @@ class AshaDashboard extends StatefulWidget {
 
 class _AshaDashboardState extends State<AshaDashboard> {
   int _selectedIndex = 0;
+  final _profileService = ProfileService();
+  final _authService = AuthService();
+  
+  Map<String, dynamic>? _profileData;
+  bool _isLoadingProfile = true;
 
   final stats = {
     'totalPatients': 42,
@@ -23,32 +30,71 @@ class _AshaDashboardState extends State<AshaDashboard> {
     'campaigns': 3,
   };
 
-  final List<Patient> patients = [
-    Patient(
-      id: 'P001',
-      name: 'Priya Sharma',
-      age: '28',
-      gender: 'Female',
-      condition: 'High-risk pregnancy',
-      lastVisit: '2 days ago',
-      nextVisit: 'Today',
-      priority: PatientPriority.critical,
-      phone: '+91 98765 43210',
-      address: 'Rampur, Ward 3',
-    ),
-    Patient(
-      id: 'P002',
-      name: 'Ravi Kumar',
-      age: '2',
-      gender: 'Male',
-      condition: 'Vaccination due',
-      lastVisit: '1 week ago',
-      nextVisit: 'Tomorrow',
-      priority: PatientPriority.high,
-      phone: '+91 87654 32109',
-      address: 'Rampur, Ward 1',
-    ),
+  final List<Map<String, dynamic>> patients = [
+    {
+      'id': 'P001',
+      'name': 'Priya Sharma',
+      'age': '28',
+      'gender': 'Female',
+      'condition': 'High-risk pregnancy - 8 months',
+      'lastVisit': '2 days ago',
+      'nextVisit': 'Today',
+      'priority': 'Critical',
+      'priorityColor': AppColors.criticalPriority,
+      'phone': '+91 98765 43210',
+      'address': 'Rampur, Ward 3',
+    },
+    {
+      'id': 'P002',
+      'name': 'Ravi Kumar',
+      'age': '2',
+      'gender': 'Male',
+      'condition': 'Vaccination due - Measles',
+      'lastVisit': '1 week ago',
+      'nextVisit': 'Tomorrow',
+      'priority': 'High',
+      'priorityColor': AppColors.highPriority,
+      'phone': '+91 87654 32109',
+      'address': 'Rampur, Ward 1',
+    },
+    {
+      'id': 'P003',
+      'name': 'Sunita Devi',
+      'age': '45',
+      'gender': 'Female',
+      'condition': 'Diabetes monitoring',
+      'lastVisit': '3 days ago',
+      'nextVisit': 'In 3 days',
+      'priority': 'Medium',
+      'priorityColor': AppColors.mediumPriority,
+      'phone': '+91 76543 21098',
+      'address': 'Rampur, Ward 2',
+    },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      final profile = await _profileService.getAshaProfile();
+      if (mounted) {
+        setState(() {
+          _profileData = profile;
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+      }
+      print('Error loading profile: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +111,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
     return AppBar(
       backgroundColor: AppColors.primary,
       elevation: 0,
+      automaticallyImplyLeading: false,
       title: Text(
         'ASHA Dashboard',
         style: GoogleFonts.poppins(
@@ -107,9 +154,45 @@ class _AshaDashboardState extends State<AshaDashboard> {
           icon: const Icon(Icons.sync, color: Colors.white),
           onPressed: _showSync,
         ),
-        IconButton(
-          icon: const Icon(Icons.logout, color: Colors.white),
-          onPressed: _showLogoutDialog,
+        PopupMenuButton(
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'profile',
+              child: Row(
+                children: [
+                  Icon(Icons.person, size: 20),
+                  SizedBox(width: 8),
+                  Text('My Profile'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout, color: Colors.red, size: 20),
+                  SizedBox(width: 8),
+                  Text('Logout', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+          onSelected: (value) {
+            if (value == 'profile') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileEditScreen(
+                    role: 'ASHA',
+                    onProfileUpdated: _loadProfile,
+                  ),
+                ),
+              );
+            } else if (value == 'logout') {
+              _showLogoutDialog();
+            }
+          },
         ),
       ],
     );
@@ -208,13 +291,17 @@ class _AshaDashboardState extends State<AshaDashboard> {
             ],
           ),
           const SizedBox(height: 8),
-          ...patients.map((p) => PatientCard(patient: p)),
+          ...patients.map((p) => _buildPatientCard(p)),
         ],
       ),
     );
   }
 
   Widget _buildWelcomeCard() {
+    final name = _profileData?['name'] ?? 'ASHA Worker';
+    final village = _profileData?['village'] ?? 'Loading...';
+    final ward = _profileData?['ward'] ?? '';
+    
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -262,23 +349,35 @@ class _AshaDashboardState extends State<AshaDashboard> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Kamala Devi',
+                    _isLoadingProfile ? 'Loading...' : name,
                     style: GoogleFonts.poppins(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'ASHA Worker • Rampur Village',
+                    _isLoadingProfile 
+                        ? 'ASHA Worker' 
+                        : 'ASHA Worker • $village${ward.isNotEmpty ? ', Ward $ward' : ''}',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
+            if (_isLoadingProfile)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
           ],
         ),
       ),
@@ -463,6 +562,114 @@ class _AshaDashboardState extends State<AshaDashboard> {
     );
   }
 
+  Widget _buildPatientCard(Map<String, dynamic> patient) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: (patient['priorityColor'] as Color).withOpacity(0.2),
+                  child: Icon(
+                    Icons.person,
+                    color: patient['priorityColor'] as Color,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        patient['name'],
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${patient['gender']}, ${patient['age']} years',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (patient['priorityColor'] as Color).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    patient['priority'].toUpperCase(),
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: patient['priorityColor'] as Color,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    patient['condition'],
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Last: ${patient['lastVisit']}',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.event, size: 14, color: patient['priorityColor'] as Color),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Next: ${patient['nextVisit']}',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: patient['priorityColor'] as Color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPatientsPage() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -491,19 +698,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
             ),
           ),
           const SizedBox(height: 16),
-          ...patients.map((p) => PatientCard(patient: p)),
-          const SizedBox(height: 16),
-          Center(
-            child: ElevatedButton.icon(
-              onPressed: () => _showAddPatient(),
-              icon: const Icon(Icons.add),
-              label: const Text('Add New Patient'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              ),
-            ),
-          ),
+          ...patients.map((p) => _buildPatientCard(p)),
         ],
       ),
     );
@@ -528,7 +723,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
             ),
             const SizedBox(height: 12),
             Text(
-              'View upcoming visits\nand follow-ups',
+              'View upcoming visits and follow-ups',
               style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
@@ -553,17 +748,47 @@ class _AshaDashboardState extends State<AshaDashboard> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildMenuTile(Icons.person, 'My Profile', 'View profile', AppColors.primary),
+          _buildMenuTile(
+            Icons.person,
+            'My Profile',
+            'View and edit profile',
+            AppColors.primary,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileEditScreen(
+                    role: 'ASHA',
+                    onProfileUpdated: _loadProfile,
+                  ),
+                ),
+              );
+            },
+          ),
           _buildMenuTile(Icons.language, 'Language', 'English • हिंदी', AppColors.info),
           _buildMenuTile(Icons.bar_chart, 'Performance', 'View stats', AppColors.success),
           _buildMenuTile(Icons.help, 'Help', 'Support', AppColors.warning),
           _buildMenuTile(Icons.settings, 'Settings', 'Preferences', AppColors.textSecondary),
+          const SizedBox(height: 12),
+          _buildMenuTile(
+            Icons.logout,
+            'Logout',
+            'Sign out',
+            AppColors.error,
+            onTap: _showLogoutDialog,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuTile(IconData icon, String title, String subtitle, Color color) {
+  Widget _buildMenuTile(
+    IconData icon,
+    String title,
+    String subtitle,
+    Color color,
+    {VoidCallback? onTap}
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -575,35 +800,36 @@ class _AshaDashboardState extends State<AshaDashboard> {
           ),
           child: Icon(icon, color: color, size: 22),
         ),
-        title: Text(title, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle, style: GoogleFonts.inter(fontSize: 12)),
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+        ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () {},
+        onTap: onTap ?? () {},
       ),
     );
   }
-
-  // ===========================
-  // Dialog methods
-  // ===========================
 
   void _showFeatureDialog(String feature) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(feature, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        content: Text(
-          'This feature allows you to manage $feature efficiently.',
-          style: GoogleFonts.inter(),
-        ),
+        content: Text('This feature allows you to manage $feature efficiently.', style: GoogleFonts.inter()),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$feature opened!')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$feature opened!')));
             },
             child: const Text('Open'),
           ),
@@ -623,11 +849,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
             ListTile(
               leading: Icon(Icons.warning, color: AppColors.error),
               title: Text('High-risk patient needs attention', style: GoogleFonts.inter(fontSize: 13)),
-              dense: true,
-            ),
-            ListTile(
-              leading: Icon(Icons.vaccines, color: AppColors.warning),
-              title: Text('2 vaccinations due tomorrow', style: GoogleFonts.inter(fontSize: 13)),
               dense: true,
             ),
           ],
@@ -669,9 +890,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Emergency alert sent!')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Emergency alert sent!')));
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Send'),
@@ -699,20 +918,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
     );
   }
 
-  void _showAddPatient() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Patient'),
-        content: const Text('Patient registration form will open here.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Add')),
-        ],
-      ),
-    );
-  }
-
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -720,17 +925,18 @@ class _AshaDashboardState extends State<AshaDashboard> {
         title: const Text('Logout'),
         content: const Text('Are you sure you want to logout?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Replace with your login route
-              Navigator.pushReplacementNamed(context, '/');
+            onPressed: () async {
+              await _authService.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+                  (route) => false,
+                );
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Logout'),
           ),
         ],

@@ -2,26 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/colors.dart';
 import '../../../services/storage_service.dart';
-import '../asha/asha_dashboard.dart';
-import '../phc/phc_dashboard.dart';
+import '../auth/login_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
 
-  Future<void> _selectRole(BuildContext context, String role, Widget dashboard) async {
-    print('Saving role: $role'); // Debug
-    
-    // Save the selected role
+  Future<void> _selectRole(BuildContext context, String role) async {
+    // Save role temporarily
     await StorageService.saveUserRole(role);
     
-    // Verify it was saved
-    final savedRole = await StorageService.getUserRole();
-    print('Role saved successfully: $savedRole'); // Debug
-    
-    // Navigate to dashboard
+    // Navigate to login
     if (context.mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => dashboard),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LoginScreen(role: role),
+        ),
       );
     }
   }
@@ -41,8 +37,6 @@ class RoleSelectionScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
                       colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
                     ),
                     borderRadius: BorderRadius.circular(30),
@@ -96,7 +90,7 @@ class RoleSelectionScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
                   ),
-                  onTap: () => _selectRole(context, 'ASHA', const AshaDashboard()),
+                  onTap: () => _selectRole(context, 'ASHA'),
                 ),
                 const SizedBox(height: 20),
                 _RoleButton(
@@ -106,7 +100,7 @@ class RoleSelectionScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     colors: [Color(0xFF0D47A1), Color(0xFF1976D2)],
                   ),
-                  onTap: () => _selectRole(context, 'PHC', const PHCDashboard()),
+                  onTap: () => _selectRole(context, 'PHC'),
                 ),
                 const SizedBox(height: 48),
                 Text(
