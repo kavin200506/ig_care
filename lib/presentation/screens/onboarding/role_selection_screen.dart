@@ -3,15 +3,20 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/colors.dart';
 import '../../../services/storage_service.dart';
 import '../auth/login_screen.dart';
+import 'package:asha_ehr_app/services/voice_service_singleton.dart';
 
-class RoleSelectionScreen extends StatelessWidget {
+class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
 
+  @override
+  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+}
+
+class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
+  bool _listening = false;
+
   Future<void> _selectRole(BuildContext context, String role) async {
-    // Save role temporarily
     await StorageService.saveUserRole(role);
-    
-    // Navigate to login
     if (context.mounted) {
       Navigator.push(
         context,
@@ -20,6 +25,46 @@ class RoleSelectionScreen extends StatelessWidget {
         ),
       );
     }
+  }
+
+  Future<void> _startVoiceNavigation() async {
+    setState(() {
+      _listening = true;
+    });
+    await voiceService.init();
+    await voiceService.startListening(
+      onResult: (String command) {
+        _handleVoiceCommand(command.trim().toLowerCase());
+        setState(() {
+          _listening = false;
+        });
+      },
+      onError: (String? err) {
+        _showError(err ?? "Unknown error");
+        setState(() {
+          _listening = false;
+        });
+      },
+    );
+  }
+
+  void _handleVoiceCommand(String command) {
+    if (command.contains('asha')) {
+      voiceService.speak('ASHA worker selected. Proceed to login.');
+      _selectRole(context, 'ASHA');
+    } else if (command.contains('phc')) {
+      voiceService.speak('PHC staff selected. Proceed to login.');
+      _selectRole(context, 'PHC');
+    } else {
+      voiceService.speak("Command not recognized. Please say 'ASHA' or 'PHC'.");
+      _showError("Voice command not recognized. Say 'ASHA' or 'PHC'.");
+    }
+  }
+
+  void _showError(String err) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(err), backgroundColor: Colors.red),
+    );
   }
 
   @override
@@ -102,7 +147,39 @@ class RoleSelectionScreen extends StatelessWidget {
                   ),
                   onTap: () => _selectRole(context, 'PHC'),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 36),
+
+                // --- Microphone voice navigation button ---
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.primary,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  icon: Icon(
+                    _listening ? Icons.mic : Icons.mic_none,
+                    color: _listening ? Colors.red : AppColors.primary,
+                  ),
+                  label: Text(
+                    _listening ? "Listening..." : "Voice Navigation",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: _listening ? null : _startVoiceNavigation,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Say 'ASHA' or 'PHC' to choose your role.",
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.black.withOpacity(0.6),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
                 Text(
                   'Smart India Hackathon 2025',
                   style: GoogleFonts.inter(
