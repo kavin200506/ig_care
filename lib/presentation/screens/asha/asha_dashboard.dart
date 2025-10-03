@@ -5,6 +5,8 @@ import '../../../services/profile_service.dart';
 import '../../../services/auth_service.dart';
 import '../../widgets/profile_edit_screen.dart';
 import '../onboarding/role_selection_screen.dart';
+// VoiceService Singleton import
+import 'package:asha_ehr_app/services/voice_service_singleton.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -17,9 +19,10 @@ class _AshaDashboardState extends State<AshaDashboard> {
   int _selectedIndex = 0;
   final _profileService = ProfileService();
   final _authService = AuthService();
-  
+
   Map<String, dynamic>? _profileData;
   bool _isLoadingProfile = true;
+  bool _isListening = false;
 
   final stats = {
     'totalPatients': 42,
@@ -96,6 +99,74 @@ class _AshaDashboardState extends State<AshaDashboard> {
     }
   }
 
+  // --- VOICE COMMAND LOGIC ---
+  Future<void> _startVoiceNavigation() async {
+    setState(() => _isListening = true);
+    await voiceService.init();
+    await voiceService.startListening(
+      onResult: (String command) {
+        _handleVoiceCommand(command.trim().toLowerCase());
+        setState(() => _isListening = false);
+      },
+      onError: (String? err) {
+        _showError(err ?? "Unknown error");
+        setState(() => _isListening = false);
+      },
+    );
+  }
+
+  void _handleVoiceCommand(String command) {
+    if (command.contains("logout")) {
+      voiceService.speak("Logging out");
+      _showLogoutDialog();
+    } else if (command.contains("patients")) {
+      voiceService.speak("Opening patient list");
+      setState(() => _selectedIndex = 1);
+    } else if (command.contains("dashboard") || command.contains("home")) {
+      voiceService.speak("Going to dashboard");
+      setState(() => _selectedIndex = 0);
+    } else if (command.contains("schedule") || command.contains("appointment")) {
+      voiceService.speak("Opening schedule");
+      setState(() => _selectedIndex = 2);
+    } else if (command.contains("reminder")) {
+      voiceService.speak("Showing reminders");
+      setState(() => _selectedIndex = 2);
+    } else if (command.contains("settings") || command.contains("more")) {
+      voiceService.speak("More options");
+      setState(() => _selectedIndex = 3);
+    } else if (command.contains("profile")) {
+      voiceService.speak("Opening profile editor");
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfileEditScreen(
+            role: 'ASHA',
+            onProfileUpdated: _loadProfile,
+          ),
+        ),
+      );
+    } else if (command.contains("emergency")) {
+      voiceService.speak("Emergency alert dialog opened");
+      _showEmergency();
+    } else if (command.contains("sync")) {
+      voiceService.speak("Syncing data");
+      _showSync();
+    } else {
+      voiceService.speak(
+        "Command not recognized. Try saying dashboard, patients, schedule, reminders, profile, settings, or logout."
+      );
+      _showError(
+        "Command not recognized. Try: dashboard, patients, schedule, reminders, profile, settings, or logout."
+      );
+    }
+  }
+
+  void _showError(String err) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(err), backgroundColor: Colors.red),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,9 +174,26 @@ class _AshaDashboardState extends State<AshaDashboard> {
       appBar: _buildAppBar(),
       body: _getSelectedPage(),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedIndex == 0 ? _buildFAB() : null,
+      floatingActionButton: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          if (_selectedIndex == 0) _buildFAB(),
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0, bottom: 100.0),
+            child: FloatingActionButton(
+              heroTag: "voiceNav",
+              backgroundColor: _isListening ? Colors.red : AppColors.primary,
+              onPressed: _isListening ? null : _startVoiceNavigation,
+              tooltip: _isListening ? "Listening..." : "Voice Navigation",
+              child: Icon(_isListening ? Icons.mic : Icons.mic_none),
+            ),
+          ),
+        ],
+      ),
     );
   }
+
+  // ----- Below: Your UNCHANGED original widgets and helper methods -----
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -301,7 +389,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
     final name = _profileData?['name'] ?? 'ASHA Worker';
     final village = _profileData?['village'] ?? 'Loading...';
     final ward = _profileData?['ward'] ?? '';
-    
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -471,7 +558,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
       {'title': 'Reminders', 'icon': Icons.notifications_active, 'color': AppColors.warning, 'subtitle': '${stats['reminders']} Upcoming'},
       {'title': 'Campaigns', 'icon': Icons.campaign, 'color': AppColors.maternal, 'subtitle': '${stats['campaigns']} Active'},
     ];
-
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

@@ -5,6 +5,8 @@ import '../../../services/profile_service.dart';
 import '../../../services/auth_service.dart';
 import '../../widgets/profile_edit_screen.dart';
 import '../onboarding/role_selection_screen.dart';
+// IMPORTANT: import your voice service singleton!
+import 'package:asha_ehr_app/services/voice_service_singleton.dart';
 
 class PHCDashboard extends StatefulWidget {
   const PHCDashboard({super.key});
@@ -17,9 +19,10 @@ class _PHCDashboardState extends State<PHCDashboard> {
   int _selectedIndex = 0;
   final _profileService = ProfileService();
   final _authService = AuthService();
-  
+
   Map<String, dynamic>? _profileData;
   bool _isLoadingProfile = true;
+  bool _isListening = false;
 
   final Map<String, dynamic> phcStats = {
     'totalPatients': 342,
@@ -75,6 +78,65 @@ class _PHCDashboardState extends State<PHCDashboard> {
       setState(() => _isLoadingProfile = false);
       print('Error loading profile: $e');
     }
+  }
+
+  // --- VOICE NAVIGATION LOGIC ---
+  Future<void> _startVoiceNavigation() async {
+    setState(() => _isListening = true);
+    await voiceService.init();
+    await voiceService.startListening(
+      onResult: (String command) {
+        _handleVoiceCommand(command.trim().toLowerCase());
+        setState(() => _isListening = false);
+      },
+      onError: (String? err) {
+        _showError(err ?? "Unknown error");
+        setState(() => _isListening = false);
+      },
+    );
+  }
+
+  void _handleVoiceCommand(String command) {
+    if (command.contains("dashboard")) {
+      voiceService.speak("Switching to dashboard");
+      setState(() => _selectedIndex = 0);
+    } else if (command.contains("worker") || command.contains("asha")) {
+      voiceService.speak("Showing ASHA workers");
+      setState(() => _selectedIndex = 1);
+    } else if (command.contains("report")) {
+      voiceService.speak("Opening reports");
+      setState(() => _selectedIndex = 2);
+    } else if (command.contains("setting") || command.contains("preference")) {
+      voiceService.speak("Opening settings");
+      setState(() => _selectedIndex = 3);
+    } else if (command.contains("profile")) {
+      voiceService.speak("Opening profile editor");
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) =>
+                ProfileEditScreen(role: 'PHC', onProfileUpdated: _loadProfile)),
+      );
+    } else if (command.contains("logout") || command.contains("sign out")) {
+      voiceService.speak("Logging out");
+      _showLogoutDialog();
+    } else if (command.contains("notification")) {
+      voiceService.speak("Opening notifications");
+      _showNotifications();
+    } else {
+      voiceService.speak(
+        "Command not recognized. Try: dashboard, ASHA workers, reports, settings, profile, logout, or notifications."
+      );
+      _showError(
+        "Command not recognized. Try: dashboard, ASHA workers, reports, settings, profile, logout, or notifications."
+      );
+    }
+  }
+
+  void _showError(String err) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(err), backgroundColor: Colors.red),
+    );
   }
 
   @override
@@ -148,6 +210,16 @@ class _PHCDashboardState extends State<PHCDashboard> {
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(right: 8.0, bottom: 12.0),
+        child: FloatingActionButton(
+          heroTag: "phcVoiceNav",
+          backgroundColor: _isListening ? Colors.red : AppColors.secondary,
+          onPressed: _isListening ? null : _startVoiceNavigation,
+          tooltip: _isListening ? "Listening..." : "Voice Navigation",
+          child: Icon(_isListening ? Icons.mic : Icons.mic_none),
+        ),
+      ),
     );
   }
 
@@ -206,7 +278,7 @@ class _PHCDashboardState extends State<PHCDashboard> {
     final name = _profileData?['name'] ?? 'PHC Staff';
     final designation = _profileData?['designation'] ?? 'Loading...';
     final department = _profileData?['department'] ?? '';
-    
+
     return Card(
       child: Container(
         width: double.infinity,
