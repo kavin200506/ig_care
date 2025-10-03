@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+// ignore_for_file: deprecated_member_use
+
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../utils/colors.dart';
@@ -120,7 +125,11 @@ class PatientCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
+<<<<<<< HEAD
                         Icon(
+=======
+                        const Icon(
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
                           Icons.medical_information,
                           size: 16,
                           color: AppColors.primary,
@@ -140,7 +149,11 @@ class PatientCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
+<<<<<<< HEAD
                         Icon(
+=======
+                        const Icon(
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
                           Icons.access_time,
                           size: 14,
                           color: AppColors.onSurfaceVariant,

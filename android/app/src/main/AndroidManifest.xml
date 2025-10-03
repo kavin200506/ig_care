@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+<<<<<<< HEAD
         android:label="ASHA EHR"
+=======
+        android:label="Ig Care"
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

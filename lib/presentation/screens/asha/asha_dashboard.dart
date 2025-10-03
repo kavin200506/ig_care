@@ -5,6 +5,10 @@ import '../../../services/profile_service.dart';
 import '../../../services/auth_service.dart';
 import '../../widgets/profile_edit_screen.dart';
 import '../onboarding/role_selection_screen.dart';
+<<<<<<< HEAD
+=======
+import '../patients/patients_screen.dart'; // Add this import
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -30,6 +34,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
     'campaigns': 3,
   };
 
+<<<<<<< HEAD
   final List<Map<String, dynamic>> patients = [
     {
       'id': 'P001',
@@ -71,6 +76,9 @@ class _AshaDashboardState extends State<AshaDashboard> {
       'address': 'Rampur, Ward 2',
     },
   ];
+=======
+  // Remove patients list from here since it's now in patients_screen.dart
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
 
   @override
   void initState() {
@@ -242,7 +250,11 @@ class _AshaDashboardState extends State<AshaDashboard> {
       case 0:
         return _buildDashboard();
       case 1:
+<<<<<<< HEAD
         return _buildPatientsPage();
+=======
+        return const PatientsScreen(); // Now using separate patients screen
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
       case 2:
         return _buildSchedulePage();
       case 3:
@@ -291,12 +303,52 @@ class _AshaDashboardState extends State<AshaDashboard> {
             ],
           ),
           const SizedBox(height: 8),
+<<<<<<< HEAD
           ...patients.map((p) => _buildPatientCard(p)),
+=======
+          // You can keep a few sample patients here for the dashboard preview
+          _buildSamplePatientsPreview(),
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
         ],
       ),
     );
   }
 
+<<<<<<< HEAD
+=======
+  // Add this method to show sample patients in dashboard
+  Widget _buildSamplePatientsPreview() {
+    final samplePatients = [
+      {
+        'id': 'P001',
+        'name': 'Priya Sharma',
+        'age': '28',
+        'gender': 'Female',
+        'condition': 'High-risk pregnancy - 8 months',
+        'lastVisit': '2 days ago',
+        'nextVisit': 'Today',
+        'priority': 'Critical',
+        'priorityColor': AppColors.criticalPriority,
+      },
+      {
+        'id': 'P002',
+        'name': 'Ravi Kumar',
+        'age': '2',
+        'gender': 'Male',
+        'condition': 'Vaccination due - Measles',
+        'lastVisit': '1 week ago',
+        'nextVisit': 'Tomorrow',
+        'priority': 'High',
+        'priorityColor': AppColors.highPriority,
+      },
+    ];
+
+    return Column(
+      children: samplePatients.map((p) => _buildPatientCard(p)).toList(),
+    );
+  }
+
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
   Widget _buildWelcomeCard() {
     final name = _profileData?['name'] ?? 'ASHA Worker';
     final village = _profileData?['village'] ?? 'Loading...';
@@ -670,6 +722,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
     );
   }
 
+<<<<<<< HEAD
   Widget _buildPatientsPage() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -704,6 +757,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
     );
   }
 
+=======
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
   Widget _buildSchedulePage() {
     return Center(
       child: Padding(
@@ -943,4 +998,8 @@ class _AshaDashboardState extends State<AshaDashboard> {
       ),
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)

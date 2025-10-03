@@ -761,12 +761,20 @@ class _PHCDashboardState extends State<PHCDashboard> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+<<<<<<< HEAD
               leading: Icon(Icons.warning, color: AppColors.error),
+=======
+              leading: const Icon(Icons.warning, color: AppColors.error),
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
               title: Text('High-risk patient needs attention', style: GoogleFonts.inter(fontSize: 13)),
               dense: true,
             ),
             ListTile(
+<<<<<<< HEAD
               leading: Icon(Icons.vaccines, color: AppColors.warning),
+=======
+              leading: const Icon(Icons.vaccines, color: AppColors.warning),
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
               title: Text('2 vaccinations due tomorrow', style: GoogleFonts.inter(fontSize: 13)),
               dense: true,
             ),

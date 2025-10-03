@@ -44,6 +44,10 @@ class _SplashScreenState extends State<SplashScreen>
     // Check if first launch
     final isFirstLaunch = await StorageService.isFirstLaunch();
     
+<<<<<<< HEAD
+=======
+    // ignore: avoid_print
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
     print('First Launch: $isFirstLaunch'); // Debug
     
     if (isFirstLaunch) {

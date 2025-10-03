@@ -179,7 +179,11 @@ class _RoleButton extends StatelessWidget {
                   ],
                 ),
               ),
+<<<<<<< HEAD
               Icon(
+=======
+              const Icon(
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
                 Icons.arrow_forward_ios,
                 size: 24,
                 color: AppColors.textSecondary,

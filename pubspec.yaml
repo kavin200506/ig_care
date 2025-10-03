@@ -35,9 +35,21 @@ dependencies:
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
+<<<<<<< HEAD
+=======
+  flutter_launcher_icons: ^0.14.1
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
 
+<<<<<<< HEAD
+=======
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  
+>>>>>>> ba92513 (Initial commit: Max Heap gem insertion project)
 flutter:
   uses-material-design: true
