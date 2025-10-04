@@ -37,13 +37,13 @@ class VoiceService {
   }) async {
     bool micOk = await _ensureMicPermission();
     if (!micOk) {
-      if (onError != null) onError!("Microphone permission denied.");
+      if (onError != null) onError("Microphone permission denied.");
       return;
     }
 
     if (!_speechInitialized) await init();
     if (!_speech.isAvailable) {
-      if (onError != null) onError!("Speech recognition not available.");
+      if (onError != null) onError("Speech recognition not available.");
       return;
     }
 
