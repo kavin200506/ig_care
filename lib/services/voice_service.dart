@@ -51,12 +51,11 @@ class VoiceService {
     _speech.listen(
       localeId: localeId,
       onResult: (result) {
-        if (result.finalResult) {
-          _lastWords = result.recognizedWords;
-          onResult(_lastWords);
-        }
+        // Stream partial and final results for real-time UI updates
+        _lastWords = result.recognizedWords;
+        onResult(_lastWords);
       },
-      listenFor: const Duration(seconds: 10),
+      listenFor: const Duration(seconds: 20),
       cancelOnError: true,
       listenMode: stt.ListenMode.confirmation,
     );

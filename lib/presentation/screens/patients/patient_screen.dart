@@ -228,25 +228,30 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Widget _buildQuickActionsGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        childAspectRatio: 1.0,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _quickActions.length,
-      itemBuilder: (context, index) {
-        final action = _quickActions[index];
-        return _buildQuickActionCard(
-          title: action['title'] as String,
-          icon: action['icon'] as IconData,
-          color: action['color'] as Color,
-          subtitle: action['subtitle'] as String,
-          onTap: () => _handleQuickAction(
-              action['category'] as String, action['title'] as String),
+    // Responsive grid to prevent pixel overflows on small screens
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 160, // ~2-3 columns on phones, more on tablets
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.1,
+          ),
+          itemCount: _quickActions.length,
+          itemBuilder: (context, index) {
+            final action = _quickActions[index];
+            return _buildQuickActionCard(
+              title: action['title'] as String,
+              icon: action['icon'] as IconData,
+              color: action['color'] as Color,
+              subtitle: action['subtitle'] as String,
+              onTap: () => _handleQuickAction(
+                  action['category'] as String, action['title'] as String),
+            );
+          },
         );
       },
     );
@@ -542,13 +547,21 @@ class _PatientScreenState extends State<PatientScreen> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _viewPatientDetails(patient, documentId),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.visibility, size: 16),
-                        SizedBox(width: 4),
-                        Text('View Details'),
-                      ],
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.visibility, size: 14),
+                          SizedBox(width: 4),
+                          Text('View Details', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -558,14 +571,20 @@ class _PatientScreenState extends State<PatientScreen> {
                     onPressed: () => _scheduleVisit(patient, documentId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      visualDensity: VisualDensity.compact,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.calendar_today, size: 16),
-                        SizedBox(width: 4),
-                        Text('Schedule Visit'),
-                      ],
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.calendar_today, size: 14),
+                          SizedBox(width: 4),
+                          Text('Schedule Visit', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -764,72 +783,93 @@ class _PatientScreenState extends State<PatientScreen> {
       builder: (context) => AlertDialog(
         title: Text('Register New Patient',
             style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        content: const Text('Select the type of patient to register:'),
-        actions: [
-          // Main action buttons
-          Row(
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _navigateToAddPatientForm();
-                      },
-                      icon: Icon(Icons.person_add,
-                          size: 40, color: AppColors.primary),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.primary.withOpacity(0.1),
-                        padding: const EdgeInsets.all(16),
-                      ),
+              const Text('Select the type of patient to register:'),
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 16,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: 120,
+                    child: Column(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _navigateToAddPatientForm();
+                          },
+                          icon: Icon(Icons.person_add,
+                              size: 40, color: AppColors.primary),
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            padding: const EdgeInsets.all(16),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('General', style: TextStyle(fontSize: 12)),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    const Text('General', style: TextStyle(fontSize: 12)),
-                  ],
-                ),
+                  ),
+                  SizedBox(
+                    width: 120,
+                    child: Column(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _navigateToMaternalForm();
+                          },
+                          icon: Icon(Icons.pregnant_woman,
+                              size: 40, color: AppColors.maternal),
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.maternal.withOpacity(0.1),
+                            padding: const EdgeInsets.all(16),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('Maternal', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Expanded(
-                child: Column(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _navigateToMaternalForm();
-                      },
-                      icon: Icon(Icons.pregnant_woman,
-                          size: 40, color: AppColors.maternal),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.maternal.withOpacity(0.1),
-                        padding: const EdgeInsets.all(16),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text('Maternal', style: TextStyle(fontSize: 12)),
-                  ],
+              const SizedBox(height: 16),
+              // Quick start with voice
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _navigateToAddPatientForm(autoVoice: true);
+                },
+                icon: const Icon(Icons.mic),
+                label: const Text('Start Registration With Voice'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Cancel button
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
         ],
       ),
     );
   }
 
-  void _navigateToAddPatientForm() {
+  void _navigateToAddPatientForm({bool autoVoice = false}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PatientRegistrationForm(),
+        builder: (context) => PatientRegistrationForm(autoOpenVoice: autoVoice),
       ),
     );
   }
