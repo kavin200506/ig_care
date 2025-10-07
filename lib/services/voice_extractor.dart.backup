@@ -1,0 +1,122 @@
+// voice_extractor.dart
+// Shared voice extraction utility for patient registration features
+
+library voice_extractor;
+
+Map<String, String> extractPatientFeatures(String text) {
+  final Map<String, String> extracted = {};
+  final lowerText = text.toLowerCase();
+
+  // General patient
+  final nameRegex = RegExp(r'name\s+(is\s+)?([a-zA-Z\s]+)', caseSensitive: false);
+  final nameMatch = nameRegex.firstMatch(text);
+  if (nameMatch != null) extracted['name'] = nameMatch.group(2)?.trim() ?? '';
+
+  final ageRegex = RegExp(r'age\s+(is\s+)?(\d+)', caseSensitive: false);
+  final ageMatch = ageRegex.firstMatch(text);
+  if (ageMatch != null) extracted['age'] = ageMatch.group(2) ?? '';
+
+  final phoneRegex = RegExp(r'phone\s+(number\s+)?(is\s+)?(\d+)', caseSensitive: false);
+  final phoneMatch = phoneRegex.firstMatch(text);
+  if (phoneMatch != null) extracted['phone'] = phoneMatch.group(3) ?? '';
+
+  final addressRegex = RegExp(r'address\s+(is\s+)?(.+?)(?:\s+(age|phone|condition|$))', caseSensitive: false);
+  final addressMatch = addressRegex.firstMatch(text);
+  if (addressMatch != null) extracted['address'] = addressMatch.group(2)?.trim() ?? '';
+
+  final conditionRegex = RegExp(r'condition\s+(is\s+)?(.+?)(?:\s+(priority|category|$))', caseSensitive: false);
+  final conditionMatch = conditionRegex.firstMatch(text);
+  if (conditionMatch != null) extracted['condition'] = conditionMatch.group(2)?.trim() ?? '';
+
+  if (lowerText.contains('male')) extracted['gender'] = 'Male';
+  else if (lowerText.contains('female')) extracted['gender'] = 'Female';
+  else if (lowerText.contains('other')) extracted['gender'] = 'Other';
+
+  if (lowerText.contains('low')) extracted['priority'] = 'Low';
+  else if (lowerText.contains('medium')) extracted['priority'] = 'Medium';
+  else if (lowerText.contains('high')) extracted['priority'] = 'High';
+  else if (lowerText.contains('critical')) extracted['priority'] = 'Critical';
+
+  if (lowerText.contains('pregnant')) extracted['category'] = 'pregnant_women';
+  else if (lowerText.contains('child')) extracted['category'] = 'child_health';
+
+  final aadhaarRegex = RegExp(r'aadhaar\s+(number\s+)?(is\s+)?(\d{12})', caseSensitive: false);
+  final aadhaarMatch = aadhaarRegex.firstMatch(text);
+  if (aadhaarMatch != null) extracted['aadhaar'] = aadhaarMatch.group(3) ?? '';
+
+  final abhaRegex = RegExp(r'abha\s+(id\s+)?(is\s+)?([a-zA-Z0-9]+)', caseSensitive: false);
+  final abhaMatch = abhaRegex.firstMatch(text);
+  if (abhaMatch != null) extracted['abhaId'] = abhaMatch.group(3) ?? '';
+
+  // Family records
+  final motherNameRe = RegExp(r"mother(?:'s)?\s+name\s+(?:is\s+)?([a-zA-Z\s]+)", caseSensitive: false);
+  final motherAgeRe = RegExp(r"mother(?:'s)?\s+age\s+(?:is\s+)?(\d+)", caseSensitive: false);
+  final husbandNameRe = RegExp(r"husband(?:'s)?\s+name\s+(?:is\s+)?([a-zA-Z\s]+)", caseSensitive: false);
+  final motherPhoneRe = RegExp(r"mother(?:'s)?\s+phone(?:\s+number)?\s+(?:is\s+)?(\d{7,})", caseSensitive: false);
+  final husbandPhoneRe = RegExp(r"husband(?:'s)?\s+phone(?:\s+number)?\s+(?:is\s+)?(\d{7,})", caseSensitive: false);
+  final mctsRe = RegExp(r"(mcts|rch)\s*(id)?\s*(is)?\s*([a-zA-Z0-9/\-]+)", caseSensitive: false);
+  final bankNameRe = RegExp(r"bank\s+name(?:\s+with\s+branch)?\s+(?:is\s+)?(.+?)(?=\.|,|$)", caseSensitive: false);
+  final accountNoRe = RegExp(r"account\s+(?:number|no)\s+(?:is\s+)?([0-9]{6,})", caseSensitive: false);
+  final ifscRe = RegExp(r"ifsc|ifcs\s+code\s+(?:is\s+)?([A-Z]{4}0[A-Z0-9]{6})", caseSensitive: false);
+
+  Match? m;
+  if ((m = motherNameRe.firstMatch(text)) != null) extracted['motherName'] = m!.group(1)!.trim();
+  if ((m = motherAgeRe.firstMatch(text)) != null) extracted['motherAge'] = m!.group(1)!;
+  if ((m = husbandNameRe.firstMatch(text)) != null) extracted['husbandName'] = m!.group(1)!.trim();
+  if ((m = motherPhoneRe.firstMatch(text)) != null) extracted['motherPhone'] = m!.group(1)!;
+  if ((m = husbandPhoneRe.firstMatch(text)) != null) extracted['husbandPhone'] = m!.group(1)!;
+  if ((m = mctsRe.firstMatch(text)) != null) extracted['mctsId'] = m!.group(4)!;
+  if ((m = bankNameRe.firstMatch(text)) != null) extracted['bankName'] = m!.group(1)!.trim();
+  if ((m = accountNoRe.firstMatch(text)) != null) extracted['accountNo'] = m!.group(1)!;
+  if ((m = ifscRe.firstMatch(text)) != null) extracted['ifscCode'] = m!.group(1)!;
+
+  // Maternal records
+  final lmpRe = RegExp(r"(lmp|last\s+menses\s+period)\s*(is\s+)?(\d{1,2}[\-/]\d{1,2}[\-/]\d{2,4})", caseSensitive: false);
+  final eddRe = RegExp(r"(edd|expected\s+delivery\s+date)\s*(is\s+)?(\d{1,2}[\-/]\d{1,2}[\-/]\d{2,4})", caseSensitive: false);
+  final gravidaRe = RegExp(r"(total\s+number\s+of\s+pregnancies|gravida)\s*(is\s+)?(\d+)", caseSensitive: false);
+  final paraRe = RegExp(r"(children\s+born\s+from\s+registered\s+pregnancies|para)\s*(is\s+)?(\d+)", caseSensitive: false);
+  final prevDelivRe = RegExp(r"place\s+of\s+previous\s+delivery\s*(is\s+)?(.+?)(?=\.|,|$)", caseSensitive: false);
+  final currDelivRe = RegExp(r"place\s+of\s+current\s+delivery\s*(is\s+)?(.+?)(?=\.|,|$)", caseSensitive: false);
+
+  if ((m = lmpRe.firstMatch(text)) != null) extracted['lmp'] = m!.group(3)!;
+  if ((m = eddRe.firstMatch(text)) != null) extracted['edd'] = m!.group(3)!;
+  if ((m = gravidaRe.firstMatch(text)) != null) extracted['gravida'] = m!.group(3)!;
+  if ((m = paraRe.firstMatch(text)) != null) extracted['para'] = m!.group(3)!;
+  if ((m = prevDelivRe.firstMatch(text)) != null) extracted['prevDeliveryPlace'] = m!.group(2)!.trim();
+  if ((m = currDelivRe.firstMatch(text)) != null) extracted['currentDeliveryPlace'] = m!.group(2)!.trim();
+
+  // Infant records
+  final childNameRe = RegExp(r"child\s+name\s+(?:is\s+)?([a-zA-Z\s]+)", caseSensitive: false);
+  final childDobRe = RegExp(r"(date\s+of\s+birth|dob)\s+(?:is\s+)?(\d{1,2}[\-/]\d{1,2}[\-/]\d{2,4})", caseSensitive: false);
+  final weightRe = RegExp(r"weight\s+(?:is\s+)?([0-9]+(?:\.[0-9]+)?)", caseSensitive: false);
+  final sexRe = RegExp(r"\b(male|female|boy|girl)\b", caseSensitive: false);
+  final birthRegRe = RegExp(r"birth\s+registration\s+(?:number|no)\s+(?:is\s+)?([A-Za-z0-9\-]+)", caseSensitive: false);
+  final childMctsRe = RegExp(r"(child\s+)?(mcts|rch)\s*(id)?\s*(is\s+)?([A-Za-z0-9/\-]+)", caseSensitive: false);
+
+  if ((m = childNameRe.firstMatch(text)) != null) extracted['childName'] = m!.group(1)!.trim();
+  if ((m = childDobRe.firstMatch(text)) != null) extracted['childDob'] = m!.group(2)!;
+  if ((m = weightRe.firstMatch(text)) != null) extracted['childWeight'] = m!.group(1)!;
+  if ((m = sexRe.firstMatch(text)) != null) {
+    final v = m!.group(1)!.toLowerCase();
+    extracted['childSex'] = (v == 'female' || v == 'girl') ? 'Female' : 'Male';
+  }
+  if ((m = birthRegRe.firstMatch(text)) != null) extracted['birthRegNo'] = m!.group(1)!;
+  if ((m = childMctsRe.firstMatch(text)) != null) extracted['childMctsId'] = m!.group(5)!;
+
+  // Hospital records (selected)
+  final anmNameRe = RegExp(r"anm\s+name\s+(?:is\s+)?([a-zA-Z\s]+)", caseSensitive: false);
+  final ashaNameRe = RegExp(r"asha\s+name\s+(?:is\s+)?([a-zA-Z\s]+)", caseSensitive: false);
+  final anmPhoneRe = RegExp(r"anm\s+phone\s+(?:is\s+)?(\d{7,})", caseSensitive: false);
+  final ashaPhoneRe = RegExp(r"asha\s+phone\s+(?:is\s+)?(\d{7,})", caseSensitive: false);
+  final hospitalPhoneRe = RegExp(r"hospital\s+phone\s+(?:is\s+)?(\d{7,})", caseSensitive: false);
+  final referralPlaceRe = RegExp(r"referral\s+place\s+(?:is\s+)?(.+?)(?=\.|,|$)", caseSensitive: false);
+
+  if ((m = anmNameRe.firstMatch(text)) != null) extracted['anmName'] = m!.group(1)!.trim();
+  if ((m = ashaNameRe.firstMatch(text)) != null) extracted['ashaName'] = m!.group(1)!.trim();
+  if ((m = anmPhoneRe.firstMatch(text)) != null) extracted['anmPhone'] = m!.group(1)!;
+  if ((m = ashaPhoneRe.firstMatch(text)) != null) extracted['ashaPhone'] = m!.group(1)!;
+  if ((m = hospitalPhoneRe.firstMatch(text)) != null) extracted['hospitalPhone'] = m!.group(1)!;
+  if ((m = referralPlaceRe.firstMatch(text)) != null) extracted['referralPlace'] = m!.group(1)!.trim();
+
+  return extracted;
+}

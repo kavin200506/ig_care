@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../utils/colors.dart';
 import '../../../services/profile_service.dart';
 import '../../../services/auth_service.dart';
 import '../../widgets/profile_edit_screen.dart';
 import '../onboarding/role_selection_screen.dart';
+import '../patients/patient_screen.dart';
+import 'package:asha_ehr_app/services/voice_service_singleton.dart';
 
 class AshaDashboard extends StatefulWidget {
   const AshaDashboard({super.key});
@@ -17,65 +20,26 @@ class _AshaDashboardState extends State<AshaDashboard> {
   int _selectedIndex = 0;
   final _profileService = ProfileService();
   final _authService = AuthService();
-  
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   Map<String, dynamic>? _profileData;
   bool _isLoadingProfile = true;
+  bool _isListening = false;
 
-  final stats = {
-    'totalPatients': 42,
-    'highRisk': 5,
-    'todayVisits': 8,
-    'pending': 12,
+  Map<String, dynamic> stats = {
+    'totalPatients': 0,
+    'highRisk': 0,
+    'todayVisits': 0,
+    'pending': 0,
     'reminders': 8,
     'campaigns': 3,
   };
-
-  final List<Map<String, dynamic>> patients = [
-    {
-      'id': 'P001',
-      'name': 'Priya Sharma',
-      'age': '28',
-      'gender': 'Female',
-      'condition': 'High-risk pregnancy - 8 months',
-      'lastVisit': '2 days ago',
-      'nextVisit': 'Today',
-      'priority': 'Critical',
-      'priorityColor': AppColors.criticalPriority,
-      'phone': '+91 98765 43210',
-      'address': 'Rampur, Ward 3',
-    },
-    {
-      'id': 'P002',
-      'name': 'Ravi Kumar',
-      'age': '2',
-      'gender': 'Male',
-      'condition': 'Vaccination due - Measles',
-      'lastVisit': '1 week ago',
-      'nextVisit': 'Tomorrow',
-      'priority': 'High',
-      'priorityColor': AppColors.highPriority,
-      'phone': '+91 87654 32109',
-      'address': 'Rampur, Ward 1',
-    },
-    {
-      'id': 'P003',
-      'name': 'Sunita Devi',
-      'age': '45',
-      'gender': 'Female',
-      'condition': 'Diabetes monitoring',
-      'lastVisit': '3 days ago',
-      'nextVisit': 'In 3 days',
-      'priority': 'Medium',
-      'priorityColor': AppColors.mediumPriority,
-      'phone': '+91 76543 21098',
-      'address': 'Rampur, Ward 2',
-    },
-  ];
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadPatientStats();
   }
 
   Future<void> _loadProfile() async {
@@ -96,6 +60,119 @@ class _AshaDashboardState extends State<AshaDashboard> {
     }
   }
 
+  Future<void> _loadPatientStats() async {
+    try {
+      final patientsSnapshot = await _firestore.collection('patients').get();
+      final patients = patientsSnapshot.docs;
+      
+      final today = DateTime.now();
+      final todayString = "${today.year}-${today.month}-${today.day}";
+      
+      setState(() {
+        stats['totalPatients'] = patients.length;
+        stats['highRisk'] = patients.where((doc) {
+          final patient = doc.data() as Map<String, dynamic>;
+          return (patient['priority']?.toString().toLowerCase() == 'critical' ||
+                  patient['priority']?.toString().toLowerCase() == 'high');
+        }).length;
+        stats['todayVisits'] = patients.where((doc) {
+          final patient = doc.data() as Map<String, dynamic>;
+          return patient['nextVisit']?.toString().contains(todayString) == true;
+        }).length;
+        stats['pending'] = patients.where((doc) {
+          final patient = doc.data() as Map<String, dynamic>;
+          return patient['nextVisit'] != null && 
+                 patient['nextVisit']!.toString().isNotEmpty;
+        }).length;
+      });
+    } catch (e) {
+      print('Error loading patient stats: $e');
+    }
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'critical':
+        return AppColors.criticalPriority;
+      case 'high':
+        return AppColors.highPriority;
+      case 'medium':
+        return AppColors.mediumPriority;
+      case 'low':
+        return AppColors.lowPriority;
+      default:
+        return AppColors.mediumPriority;
+    }
+  }
+
+  // --- VOICE COMMAND LOGIC ---
+  Future<void> _startVoiceNavigation() async {
+    setState(() => _isListening = true);
+    await voiceService.init();
+    await voiceService.startListening(
+      onResult: (String command) {
+        _handleVoiceCommand(command.trim().toLowerCase());
+        setState(() => _isListening = false);
+      },
+      onError: (String? err) {
+        _showError(err ?? "Unknown error");
+        setState(() => _isListening = false);
+      },
+    );
+  }
+
+  void _handleVoiceCommand(String command) {
+    if (command.contains("logout")) {
+      voiceService.speak("Logging out");
+      _showLogoutDialog();
+    } else if (command.contains("patients")) {
+      voiceService.speak("Opening patient list");
+      setState(() => _selectedIndex = 1);
+    } else if (command.contains("dashboard") || command.contains("home")) {
+      voiceService.speak("Going to dashboard");
+      setState(() => _selectedIndex = 0);
+    } else if (command.contains("schedule") || command.contains("appointment")) {
+      voiceService.speak("Opening schedule");
+      setState(() => _selectedIndex = 2);
+    } else if (command.contains("reminder")) {
+      voiceService.speak("Showing reminders");
+      setState(() => _selectedIndex = 2);
+    } else if (command.contains("settings") || command.contains("more")) {
+      voiceService.speak("More options");
+      setState(() => _selectedIndex = 3);
+    } else if (command.contains("profile")) {
+      voiceService.speak("Opening profile editor");
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfileEditScreen(
+            role: 'ASHA',
+            onProfileUpdated: _loadProfile,
+          ),
+        ),
+      );
+    } else if (command.contains("emergency")) {
+      voiceService.speak("Emergency alert dialog opened");
+      _showEmergency();
+    } else if (command.contains("sync")) {
+      voiceService.speak("Syncing data");
+      _showSync();
+    } else {
+      voiceService.speak(
+        "Command not recognized. Try saying dashboard, patients, schedule, reminders, profile, settings, or logout."
+      );
+      _showError(
+        "Command not recognized. Try: dashboard, patients, schedule, reminders, profile, settings, or logout."
+      );
+    }
+  }
+
+  void _showError(String err) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(err), backgroundColor: Colors.red),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,7 +180,22 @@ class _AshaDashboardState extends State<AshaDashboard> {
       appBar: _buildAppBar(),
       body: _getSelectedPage(),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _selectedIndex == 0 ? _buildFAB() : null,
+      floatingActionButton: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          if (_selectedIndex == 0) _buildFAB(),
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0, bottom: 100.0),
+            child: FloatingActionButton(
+              heroTag: "voiceNav",
+              backgroundColor: _isListening ? Colors.red : AppColors.primary,
+              onPressed: _isListening ? null : _startVoiceNavigation,
+              tooltip: _isListening ? "Listening..." : "Voice Navigation",
+              child: Icon(_isListening ? Icons.mic : Icons.mic_none),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -242,7 +334,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
       case 0:
         return _buildDashboard();
       case 1:
-        return _buildPatientsPage();
+        return PatientScreen();
       case 2:
         return _buildSchedulePage();
       case 3:
@@ -291,7 +383,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
             ],
           ),
           const SizedBox(height: 8),
-          ...patients.map((p) => _buildPatientCard(p)),
+          _buildPriorityPatientsFromFirestore(),
         ],
       ),
     );
@@ -301,7 +393,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
     final name = _profileData?['name'] ?? 'ASHA Worker';
     final village = _profileData?['village'] ?? 'Loading...';
     final ward = _profileData?['ward'] ?? '';
-    
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -471,7 +562,6 @@ class _AshaDashboardState extends State<AshaDashboard> {
       {'title': 'Reminders', 'icon': Icons.notifications_active, 'color': AppColors.warning, 'subtitle': '${stats['reminders']} Upcoming'},
       {'title': 'Campaigns', 'icon': Icons.campaign, 'color': AppColors.maternal, 'subtitle': '${stats['campaigns']} Active'},
     ];
-
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -562,7 +652,43 @@ class _AshaDashboardState extends State<AshaDashboard> {
     );
   }
 
-  Widget _buildPatientCard(Map<String, dynamic> patient) {
+  Widget _buildPriorityPatientsFromFirestore() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('patients')
+          .where('priority', whereIn: ['Critical', 'High'])
+          .orderBy('priority')
+          .limit(3)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildErrorState('Error loading priority patients');
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingState();
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildNoPriorityPatientsState();
+        }
+
+        final patients = snapshot.data!.docs;
+        
+        return Column(
+          children: patients.map((doc) {
+            final patient = doc.data() as Map<String, dynamic>;
+            return _buildPatientCard(patient, doc.id);
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildPatientCard(Map<String, dynamic> patient, [String? documentId]) {
+    final priority = patient['priority']?.toString() ?? 'Medium';
+    final priorityColor = _getPriorityColor(priority);
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -573,10 +699,10 @@ class _AshaDashboardState extends State<AshaDashboard> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: (patient['priorityColor'] as Color).withOpacity(0.2),
+                  backgroundColor: priorityColor.withOpacity(0.2),
                   child: Icon(
                     Icons.person,
-                    color: patient['priorityColor'] as Color,
+                    color: priorityColor,
                     size: 20,
                   ),
                 ),
@@ -586,14 +712,14 @@ class _AshaDashboardState extends State<AshaDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        patient['name'],
+                        patient['name'] ?? 'Unknown Patient',
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
-                        '${patient['gender']}, ${patient['age']} years',
+                        '${patient['gender'] ?? 'Unknown'}, ${patient['age'] ?? 'Unknown'} years',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -605,15 +731,15 @@ class _AshaDashboardState extends State<AshaDashboard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: (patient['priorityColor'] as Color).withOpacity(0.15),
+                    color: priorityColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    patient['priority'].toUpperCase(),
+                    priority.toUpperCase(),
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: patient['priorityColor'] as Color,
+                      color: priorityColor,
                     ),
                   ),
                 ),
@@ -630,7 +756,7 @@ class _AshaDashboardState extends State<AshaDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    patient['condition'],
+                    patient['condition'] ?? 'No condition specified',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -642,20 +768,20 @@ class _AshaDashboardState extends State<AshaDashboard> {
                       Icon(Icons.access_time, size: 14, color: AppColors.textSecondary),
                       const SizedBox(width: 6),
                       Text(
-                        'Last: ${patient['lastVisit']}',
+                        'Last: ${patient['lastVisit'] ?? 'Not recorded'}',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.event, size: 14, color: patient['priorityColor'] as Color),
+                      Icon(Icons.event, size: 14, color: priorityColor),
                       const SizedBox(width: 6),
                       Text(
-                        'Next: ${patient['nextVisit']}',
+                        'Next: ${patient['nextVisit'] ?? 'Not scheduled'}',
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: patient['priorityColor'] as Color,
+                          color: priorityColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -670,35 +796,52 @@ class _AshaDashboardState extends State<AshaDashboard> {
     );
   }
 
-  Widget _buildPatientsPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+  Widget _buildLoadingState() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String error) {
+    return Container(
+      padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(Icons.error_outline, size: 40, color: AppColors.error),
+          const SizedBox(height: 8),
           Text(
-            'Patient List',
-            style: GoogleFonts.poppins(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+            error,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textSecondary,
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Search patients...',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoPriorityPatientsState() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Icon(Icons.people_outline, size: 40, color: AppColors.textSecondary.withOpacity(0.3)),
+          const SizedBox(height: 8),
+          Text(
+            'No priority patients found',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textSecondary,
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
-          ...patients.map((p) => _buildPatientCard(p)),
         ],
       ),
     );
