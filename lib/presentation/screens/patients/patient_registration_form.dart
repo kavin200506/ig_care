@@ -2,11 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math';
 import '../../../utils/colors.dart';
-// Removed modal voice dialog; using inline panel instead
-// import '../../widgets/voice_input_dialog.dart';
-import '../../../services/voice_service_singleton.dart';
-import '../../../services/voice_extractor.dart';
 
 class PatientRegistrationForm extends StatefulWidget {
   const PatientRegistrationForm({super.key, this.autoOpenVoice = false});
@@ -17,7 +14,7 @@ class PatientRegistrationForm extends StatefulWidget {
   State<PatientRegistrationForm> createState() => _PatientRegistrationFormState();
 }
 
-// Inline voice terminal panel that does not obstruct the form
+// Demo Voice Panel with PHC Staff Perspective
 class _VoiceInlinePanel extends StatefulWidget {
   final bool autoStart;
   final ValueChanged<Map<String, String>> onExtract;
@@ -28,56 +25,274 @@ class _VoiceInlinePanel extends StatefulWidget {
 }
 
 class _VoiceInlinePanelState extends State<_VoiceInlinePanel> {
-  bool _isListening = false;
+  bool _isTyping = false;
+  bool _isExtracting = false;
   String _realTimeText = '';
+  
+  // PHC Staff speaking demo data (more formal/clinical)
+  final String _demoText = 
+      "Patient's name is Priya Sharma. Age is 28 years. Female. "
+      "Phone number 9876543210. "
+      "Address Rampur Village, Ward 3, Coimbatore District, Tamil Nadu. "
+      "Patient is complaining of high fever, severe body pain, and headache for past 3 days. "
+      "This appears to be a high-risk pregnancy case in her 8th month. "
+      "Aadhaar number is 456789012345.";
 
   @override
   void initState() {
     super.initState();
     if (widget.autoStart) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startDemo());
     }
   }
 
-  Future<void> _start() async {
-    setState(() => _isListening = true);
-    await voiceService.init();
-    await voiceService.startListening(
-      onResult: (text) => setState(() => _realTimeText = text),
-      onError: (err) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Voice error: $err')),
-        );
-        setState(() => _isListening = false);
-      },
-      localeId: 'en_IN',
-    );
+  Future<void> _startDemo() async {
+    setState(() {
+      _isTyping = true;
+      _realTimeText = '';
+    });
+
+    // Slower typing: 80ms per character (more realistic for speech)
+    for (int i = 0; i < _demoText.length; i++) {
+      if (!_isTyping) break;
+      
+      // Variable speed: faster for spaces, slower for punctuation
+      int delay = 80;
+      if (_demoText[i] == ' ') {
+        delay = 60;
+      } else if (_demoText[i] == '.' || _demoText[i] == ',') {
+        delay = 200; // Pause at punctuation
+      }
+      
+      await Future.delayed(Duration(milliseconds: delay));
+      
+      if (mounted) {
+        setState(() {
+          _realTimeText = _demoText.substring(0, i + 1);
+        });
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isTyping = false);
+    }
   }
 
-  Future<void> _stop() async {
-    await voiceService.stopListening();
-    if (mounted) setState(() => _isListening = false);
+  void _stopDemo() {
+    setState(() => _isTyping = false);
   }
 
-  void _extract() {
-    // Using simplified extraction similar to dialog logic
-    final features = _extractFeatures(_realTimeText);
-    widget.onExtract(features);
-    final count = features.values.where((v) => v.isNotEmpty).length;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$count fields extracted',
-          style: const TextStyle(color: Colors.lightGreen),
+  String _generateAbhaId() {
+    final random = Random();
+    final year = DateTime.now().year.toString().substring(2);
+    final randomDigits = List.generate(10, (_) => random.nextInt(10)).join();
+    return '$year-$randomDigits';
+  }
+
+  String _detectCategory(String text) {
+    final lower = text.toLowerCase();
+    
+    // Category detection based on keywords
+    if (lower.contains('pregnant') || lower.contains('pregnancy') || lower.contains('delivery')) {
+      return 'pregnant_women';
+    } else if (lower.contains('child') || lower.contains('baby') || lower.contains('infant') || 
+               (lower.contains('year') && (lower.contains('1 ') || lower.contains('2 ') || lower.contains('3 ')))) {
+      return 'child_health';
+    } else if (lower.contains('vaccination') || lower.contains('vaccine') || lower.contains('immunization')) {
+      return 'immunization';
+    } else if (lower.contains('elderly') || lower.contains('old age') || 
+               (lower.contains('year') && (lower.contains('60') || lower.contains('70') || lower.contains('80')))) {
+      return 'elderly_care';
+    } else if (lower.contains('diabetes') || lower.contains('hypertension') || 
+               lower.contains('blood pressure') || lower.contains('sugar')) {
+      return 'chronic_diseases';
+    } else if (lower.contains('fever') || lower.contains('cold') || lower.contains('cough') || 
+               lower.contains('diarrhea') || lower.contains('headache')) {
+      return 'common_diseases';
+    } else if (lower.contains('family planning') || lower.contains('contraceptive')) {
+      return 'family_planning';
+    }
+    
+    return 'general';
+  }
+
+  Future<void> _extract() async {
+    if (_realTimeText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ No voice input recorded!'),
+          backgroundColor: Colors.red,
         ),
+      );
+      return;
+    }
+
+    setState(() => _isExtracting = true);
+
+    // Simulate AI processing with progress
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('Analyzing voice input...'),
+            ],
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: AppColors.info,
+        ),
+      );
+    }
+    
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (mounted) {
+      // Auto-detect category
+      final detectedCategory = _detectCategory(_realTimeText);
+      
+      // Extract features with enhanced data
+      final features = {
+        'name': 'Priya Sharma',
+        'age': '28',
+        'gender': 'Female',
+        'phone': '9876543210',
+        'address': 'Rampur Village, Ward 3, Coimbatore District, Tamil Nadu',
+        'condition': 'High fever, severe body pain, and headache for 3 days. High-risk pregnancy (8 months)',
+        'priority': 'Critical', // High-risk pregnancy
+        'aadhaar': '456789012345',
+        'abhaId': _generateAbhaId(), // Auto-generate ABHA ID
+        'category': detectedCategory,
+      };
+
+      widget.onExtract(features);
+      
+      setState(() => _isExtracting = false);
+
+      // Show detailed success message
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 28),
+              const SizedBox(width: 8),
+              Text(
+                'Extraction Complete',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '✨ AI successfully extracted and filled:',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              _buildExtractedField('Name', features['name']!),
+              _buildExtractedField('Age', features['age']!),
+              _buildExtractedField('Gender', features['gender']!),
+              _buildExtractedField('Phone', features['phone']!),
+              _buildExtractedField('Category', _getCategoryName(features['category']!)),
+              _buildExtractedField('Priority', features['priority']!),
+              _buildExtractedField('ABHA ID', features['abhaId']!, isGenerated: true),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, size: 16, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'All fields auto-filled from voice',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildExtractedField(String label, String value, {bool isGenerated = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check, size: 14, color: Colors.green),
+          const SizedBox(width: 8),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: GoogleFonts.inter(fontSize: 12, color: Colors.black87),
+                children: [
+                  TextSpan(
+                    text: '$label: ',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextSpan(text: value),
+                  if (isGenerated)
+                    TextSpan(
+                      text: ' (auto)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.blue.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Map<String, String> _extractFeatures(String text) {
-    // Delegate to shared extractor for better accuracy
-    return extractPatientFeatures(text);
+  String _getCategoryName(String category) {
+    switch (category) {
+      case 'pregnant_women': return 'Pregnant Women';
+      case 'child_health': return 'Child Health';
+      case 'common_diseases': return 'Common Diseases';
+      case 'family_planning': return 'Family Planning';
+      case 'immunization': return 'Immunization';
+      case 'elderly_care': return 'Elderly Care';
+      case 'chronic_diseases': return 'Chronic Diseases';
+      default: return 'General';
+    }
   }
 
   @override
@@ -88,63 +303,178 @@ class _VoiceInlinePanelState extends State<_VoiceInlinePanel> {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: AppColors.border.withOpacity(0.3)),
       ),
-      child: Padding(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade50, Colors.white],
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.terminal, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Text('Voice Terminal', style: GoogleFonts.robotoMono(fontWeight: FontWeight.w600)),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(Icons.record_voice_over, color: AppColors.primary, size: 18),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    TextButton.icon(
-                      onPressed: _isListening ? _stop : _start,
-                      icon: Icon(_isListening ? Icons.stop : Icons.mic, size: 16),
-                      label: Text(_isListening ? 'Stop' : 'Start'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PHC Staff Voice Input',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'AI-powered patient data extraction',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange),
+                  ),
+                  child: Text(
+                    'DEMO',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: _realTimeText.isEmpty ? null : _extract,
-                      icon: const Icon(Icons.auto_fix_high, size: 16),
-                      label: const Text('Extract & Fill'),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            
+            // Voice Text Display
             Container(
               width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 80, maxHeight: 140),
-              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minHeight: 100, maxHeight: 150),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green, width: 1),
-              ),
-              child: SingleChildScrollView(
-                child: Text(
-                  _realTimeText.isEmpty ? 'Listening...' : _realTimeText,
-                  style: GoogleFonts.robotoMono(color: Colors.green, fontSize: 13),
+                border: Border.all(
+                  color: _isTyping ? Colors.green : Colors.grey,
+                  width: 2,
                 ),
               ),
+              child: SingleChildScrollView(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_isTyping)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6, top: 2),
+                        child: Icon(Icons.mic, color: Colors.green, size: 14),
+                      ),
+                    Expanded(
+                      child: Text(
+                        _realTimeText.isEmpty 
+                            ? '> Press START to simulate PHC staff voice input...' 
+                            : '> $_realTimeText',
+                        style: GoogleFonts.robotoMono(
+                          color: Colors.green,
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Extraction Status
+            if (_isExtracting)
+              Container(
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(AppColors.info),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'AI is extracting patient data & auto-detecting category...',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppColors.info,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: _isTyping ? _stopDemo : _startDemo,
+                    icon: Icon(
+                      _isTyping ? Icons.stop : Icons.mic,
+                      size: 16,
+                    ),
+                    label: Text(_isTyping ? 'Stop' : 'Start Voice'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: _isTyping ? Colors.red : AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: (_realTimeText.isEmpty || _isExtracting) ? null : _extract,
+                    icon: const Icon(Icons.auto_fix_high, size: 16),
+                    label: const Text('Extract & Fill'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-
 }
 
 class _PatientRegistrationFormState extends State<PatientRegistrationForm> {
@@ -181,7 +511,6 @@ class _PatientRegistrationFormState extends State<PatientRegistrationForm> {
     super.initState();
     if (widget.autoOpenVoice) {
       _showVoicePanel = true;
-      // No dialog; inline panel will auto-start listening
     }
   }
 
@@ -193,6 +522,30 @@ class _PatientRegistrationFormState extends State<PatientRegistrationForm> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
+          // Demo Badge
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.orange),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.science, size: 14, color: Colors.orange),
+                const SizedBox(width: 4),
+                Text(
+                  'DEMO',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ),
           // Random fill button
           IconButton(
             tooltip: 'Fill with random values',
@@ -209,7 +562,7 @@ class _PatientRegistrationFormState extends State<PatientRegistrationForm> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           child: Form(
             key: _formKey,
             child: Column(
@@ -369,42 +722,62 @@ class _PatientRegistrationFormState extends State<PatientRegistrationForm> {
     }
   }
 
-  // Apply extracted voice features to form fields
   void _applyExtractedFeatures(Map<String, String> features) {
     setState(() {
-      if (features['name'] != null) _nameController.text = features['name']!;
-      if (features['age'] != null) _ageController.text = features['age']!;
-      if (features['phone'] != null) _phoneController.text = features['phone']!;
-      if (features['address'] != null) _addressController.text = features['address']!;
-      if (features['condition'] != null) _conditionController.text = features['condition']!;
-      if (features['gender'] != null) _selectedGender = features['gender']!;
-      if (features['priority'] != null) _selectedPriority = features['priority']!;
-      if (features['category'] != null) _selectedCategory = features['category']!;
-      if (features['aadhaar'] != null) _aadhaarController.text = features['aadhaar']!;
-      if (features['abhaId'] != null) _abhaController.text = features['abhaId']!;
+      if (features['name'] != null && features['name']!.isNotEmpty) {
+        _nameController.text = features['name']!;
+      }
+      if (features['age'] != null && features['age']!.isNotEmpty) {
+        _ageController.text = features['age']!;
+      }
+      if (features['phone'] != null && features['phone']!.isNotEmpty) {
+        _phoneController.text = features['phone']!;
+      }
+      if (features['address'] != null && features['address']!.isNotEmpty) {
+        _addressController.text = features['address']!;
+      }
+      if (features['condition'] != null && features['condition']!.isNotEmpty) {
+        _conditionController.text = features['condition']!;
+      }
+      if (features['gender'] != null && features['gender']!.isNotEmpty) {
+        _selectedGender = features['gender']!;
+      }
+      if (features['priority'] != null && features['priority']!.isNotEmpty) {
+        _selectedPriority = features['priority']!;
+      }
+      if (features['category'] != null && features['category']!.isNotEmpty) {
+        _selectedCategory = features['category']!;
+      }
+      if (features['aadhaar'] != null && features['aadhaar']!.isNotEmpty) {
+        _aadhaarController.text = features['aadhaar']!;
+      }
+      if (features['abhaId'] != null && features['abhaId']!.isNotEmpty) {
+        _abhaController.text = features['abhaId']!;
+      }
     });
   }
 
-  // Quick random filler for demos/tests
   void _fillRandomValues() {
+    final random = Random();
+    final year = DateTime.now().year.toString().substring(2);
+    final randomDigits = List.generate(10, (_) => random.nextInt(10)).join();
+    
     setState(() {
-      _nameController.text = 'Ravi Kumar';
-      _ageController.text = '32';
+      _nameController.text = 'Rajesh Kumar';
+      _ageController.text = '42';
       _selectedGender = 'Male';
       _phoneController.text = '9876543210';
-      _addressController.text = '12 MG Road, Pune';
-      _aadhaarController.text = '123412341234';
-      _abhaController.text = 'ABHA12345';
-      _conditionController.text = 'Fever and body ache';
-      _selectedPriority = 'High';
-      _selectedCategory = 'general';
+      _addressController.text = 'Govindpur Village, Coimbatore';
+      _aadhaarController.text = '789012345678';
+      _abhaController.text = '$year-$randomDigits';
+      _conditionController.text = 'Diabetes monitoring - blood sugar levels high';
+      _selectedPriority = 'Medium';
+      _selectedCategory = 'chronic_diseases';
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Filled with Random values for testing',
-          style: const TextStyle(color: Colors.lightGreen),
-        ),
+      const SnackBar(
+        content: Text('✅ Filled with random test values'),
+        backgroundColor: Colors.green,
       ),
     );
   }
@@ -434,14 +807,20 @@ class _PatientRegistrationFormState extends State<PatientRegistrationForm> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Patient registered successfully!')),
+            const SnackBar(
+              content: Text('✅ Patient registered successfully!'),
+              backgroundColor: Colors.green,
+            ),
           );
           Navigator.pop(context);
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error registering patient: $e')),
+            SnackBar(
+              content: Text('❌ Error registering patient: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
